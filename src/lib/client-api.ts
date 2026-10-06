@@ -38,6 +38,50 @@ async function call<T>(url: string, init?: RequestInit): Promise<ApiResult<T>> {
 
 export const apiGet = <T>(url: string) => call<T>(url, { cache: "no-store" });
 
+/**
+ * Sends a multipart form. The browser sets the multipart content type, so the
+ * JSON content-type default is removed here.
+ */
+export async function apiUpload<T>(url: string, form: FormData): Promise<ApiResult<T>> {
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "POST", body: form });
+  } catch {
+    return { ok: false, error: NETWORK_ERROR };
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body || !("data" in body)) {
+    return { ok: false, error: body?.error ?? { ...NETWORK_ERROR, code: "internal", reason: "internal" } };
+  }
+  return { ok: true, data: body.data as T };
+}
+
+const MAX_PHOTO_EDGE = 2000;
+
+/**
+ * Shrinks a camera photo to at most 2000px on its long edge as JPEG, which keeps
+ * uploads quick on mobile data and disk use modest. Falls back to the original file.
+ */
+export async function preparePhoto(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.type === "image/jpeg") {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    return blob ?? file;
+  } catch {
+    return file;
+  }
+}
+
 export const apiSend = <T>(method: "POST" | "PATCH" | "DELETE", url: string, body: unknown) =>
   call<T>(url, { method, body: JSON.stringify(body) });
 

@@ -120,6 +120,31 @@ export function createBox(
   ).outcome;
 }
 
+function requireNoHoldsInBox(ctx: Ctx, box: { id: string; move_id: string; label: string }) {
+  const { db } = ctx;
+  const held = db.get(
+    db.q
+      .selectFrom("holds")
+      .leftJoin("items", "items.id", "holds.item_id")
+      .select((eb) => [
+        eb.fn.sum<number>(eb.case().when("holds.item_id", "is", null).then(1).else(0).end()).as("move_holds"),
+        eb.fn.sum<number>(eb.case().when("items.box_id", "=", box.id).then(1).else(0).end()).as("box_holds"),
+      ])
+      .where("holds.move_id", "=", box.move_id)
+      .where("holds.released_at", "is", null),
+  );
+  if (Number(held?.move_holds ?? 0) > 0) {
+    throw new DomainError("conflict", "move_on_hold", "The whole move is on hold. Boxes cannot be sealed.");
+  }
+  if (Number(held?.box_holds ?? 0) > 0) {
+    throw new DomainError(
+      "conflict",
+      "items_on_hold",
+      `Box ${box.label} contains an item on hold. Resolve its incident before sealing.`,
+    );
+  }
+}
+
 interface BoxStatusInput {
   boxId: string;
   expectedRevision: number;
@@ -144,6 +169,8 @@ function changeBoxStatus(
         `Box ${box.label} is ${box.status}, not ${transition.from}.`,
       );
     }
+    // Sealing is progress, so holds block it. Reopening stays allowed, so held items can be repacked.
+    if (transition.to === "sealed") requireNoHoldsInBox(ctx, box);
     ctx.db.run(
       ctx.db.q
         .updateTable("boxes")
@@ -331,7 +358,13 @@ export function assignItemToBox(
     ctx.db.run(
       ctx.db.q
         .updateTable("items")
-        .set({ box_id: fingerprint.boxId, revision: row.revision + 1, updated_at: ctx.now() })
+        // A packed item that changes box must be confirmed packed again in its new box.
+        .set({
+          box_id: fingerprint.boxId,
+          status: row.status === "packed" ? "recorded" : row.status,
+          revision: row.revision + 1,
+          updated_at: ctx.now(),
+        })
         .where("id", "=", row.id),
     );
     recordAudit(ctx, {

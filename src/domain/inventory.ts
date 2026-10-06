@@ -40,6 +40,14 @@ export interface ItemView {
   boxLabel: string | null;
   boxStatus: BoxStatus | null;
   roomName: string | null;
+  /** An active hold on this item from one of its incidents. */
+  onHold: boolean;
+  /** An active whole-move hold also stops this item from progressing. */
+  moveOnHold: boolean;
+  baselineCount: number;
+  /** Fragile or valuable with no baseline photo recorded. */
+  baselineMissing: boolean;
+  openIncidents: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,14 +61,27 @@ export interface HistoryEntry {
   createdAt: string;
 }
 
+export interface MoveHoldBrief {
+  id: string;
+  reason: string;
+  revision: number;
+  createdAt: string;
+  createdByName: string;
+}
+
 export interface MoveOverview {
   move: { id: string; label: string; source: string; destination: string; status: string };
   roles: MoveRole[];
   canWrite: boolean;
+  canReview: boolean;
   rooms: RoomView[];
   boxes: BoxView[];
   unboxedCount: number;
   itemCount: number;
+  /** Active whole-move holds: nothing in the move may progress while any exist. */
+  moveHolds: MoveHoldBrief[];
+  openIncidents: number;
+  unidentifiedIncidents: number;
 }
 
 // ---------- Helpers ----------
@@ -89,7 +110,7 @@ function itemQuery(ctx: Ctx) {
     .selectFrom("items")
     .leftJoin("boxes", "boxes.id", "items.box_id")
     .leftJoin("rooms", "rooms.id", "boxes.room_id")
-    .select([
+    .select((eb) => [
       "items.id",
       "items.move_id",
       "items.description",
@@ -104,6 +125,31 @@ function itemQuery(ctx: Ctx) {
       "boxes.label as box_label",
       "boxes.status as box_status",
       "rooms.name as room_name",
+      eb
+        .selectFrom("holds")
+        .select(eb.fn.countAll<number>().as("n"))
+        .whereRef("holds.item_id", "=", "items.id")
+        .where("holds.released_at", "is", null)
+        .as("item_holds"),
+      eb
+        .selectFrom("holds")
+        .select(eb.fn.countAll<number>().as("n"))
+        .whereRef("holds.move_id", "=", "items.move_id")
+        .where("holds.item_id", "is", null)
+        .where("holds.released_at", "is", null)
+        .as("move_holds"),
+      eb
+        .selectFrom("photos")
+        .select(eb.fn.countAll<number>().as("n"))
+        .whereRef("photos.item_id", "=", "items.id")
+        .where("photos.kind", "=", "baseline")
+        .as("baseline_count"),
+      eb
+        .selectFrom("damage_incidents")
+        .select(eb.fn.countAll<number>().as("n"))
+        .whereRef("damage_incidents.item_id", "=", "items.id")
+        .where("damage_incidents.status", "!=", "resolved")
+        .as("open_incidents"),
     ]);
 }
 
@@ -114,19 +160,27 @@ export function getItemRow(ctx: Ctx, itemId: string) {
 }
 
 export function toItemView(row: ItemRow): ItemView {
+  const fragile = row.fragile === 1;
+  const valuable = row.valuable === 1;
+  const baselineCount = Number(row.baseline_count ?? 0);
   return {
     id: row.id,
     moveId: row.move_id,
     description: row.description,
     category: row.category,
-    fragile: row.fragile === 1,
-    valuable: row.valuable === 1,
+    fragile,
+    valuable,
     status: row.status,
     revision: row.revision,
     boxId: row.box_id,
     boxLabel: row.box_label,
     boxStatus: row.box_status,
     roomName: row.room_name,
+    onHold: Number(row.item_holds ?? 0) > 0,
+    moveOnHold: Number(row.move_holds ?? 0) > 0,
+    baselineCount,
+    baselineMissing: (fragile || valuable) && baselineCount === 0,
+    openIncidents: Number(row.open_incidents ?? 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -262,14 +316,48 @@ export function getMoveOverview(ctx: Ctx, actor: Actor, moveId: string): MoveOve
       .where("move_id", "=", moveId),
   );
 
+  const moveHolds = db
+    .all(
+      db.q
+        .selectFrom("holds")
+        .innerJoin("users", "users.id", "holds.created_by")
+        .select(["holds.id", "holds.reason", "holds.revision", "holds.created_at", "users.display_name"])
+        .where("holds.move_id", "=", moveId)
+        .where("holds.item_id", "is", null)
+        .where("holds.released_at", "is", null)
+        .orderBy("holds.created_at"),
+    )
+    .map((h) => ({
+      id: h.id,
+      reason: h.reason,
+      revision: h.revision,
+      createdAt: h.created_at,
+      createdByName: h.display_name,
+    }));
+
+  const incidents = db.get(
+    db.q
+      .selectFrom("damage_incidents")
+      .select((eb) => [
+        eb.fn.countAll<number>().as("open"),
+        eb.fn.sum<number>(eb.case().when("item_id", "is", null).then(1).else(0).end()).as("unidentified"),
+      ])
+      .where("move_id", "=", moveId)
+      .where("status", "!=", "resolved"),
+  );
+
   return {
     move,
     roles,
     canWrite: roles.some((r) => r === "mover" || r === "reviewer"),
+    canReview: roles.includes("reviewer"),
     rooms,
     boxes,
     itemCount: Number(counts?.total ?? 0),
     unboxedCount: Number(counts?.unboxed ?? 0),
+    moveHolds,
+    openIncidents: Number(incidents?.open ?? 0),
+    unidentifiedIncidents: Number(incidents?.unidentified ?? 0),
   };
 }
 
@@ -279,6 +367,8 @@ export interface SearchInput {
   roomId?: string;
   boxId?: string;
   unboxed?: boolean;
+  /** Only items with an active hold of their own. */
+  held?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -311,6 +401,17 @@ export function searchItems(
   if (input.roomId) query = query.where("boxes.room_id", "=", input.roomId);
   if (input.boxId) query = query.where("items.box_id", "=", input.boxId);
   if (input.unboxed) query = query.where("items.box_id", "is", null);
+  if (input.held) {
+    query = query.where((eb) =>
+      eb.exists(
+        eb
+          .selectFrom("holds")
+          .select("holds.id")
+          .whereRef("holds.item_id", "=", "items.id")
+          .where("holds.released_at", "is", null),
+      ),
+    );
+  }
 
   const rows = ctx.db.all(
     query.orderBy("items.updated_at", "desc").orderBy("items.id").limit(limit + 1).offset(offset),
@@ -382,7 +483,7 @@ export function listActivity(
       "users.display_name",
     ])
     .where("audit_events.move_id", "=", input.moveId)
-    .where("audit_events.record_type", "in", ["item", "box", "room"]);
+    .where("audit_events.record_type", "in", ["item", "box", "room", "incident", "hold"]);
   if (input.mineOnly) query = query.where("audit_events.actor_id", "=", actor.id);
   return db
     .all(query.orderBy("audit_events.created_at", "desc").limit(Math.min(input.limit ?? 20, MAX_PAGE_SIZE)))

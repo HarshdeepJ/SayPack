@@ -1,16 +1,24 @@
 import crypto from "node:crypto";
 import type { Db } from "@/db/database";
 
+/** What the domain needs to know about stored photo files. */
+export interface PhotoFiles {
+  /** True when the committed file for this storage key is present on disk. */
+  exists(storageKey: string): boolean;
+}
+
 /** Dependencies every application service receives. Swappable in tests. */
 export interface Ctx {
   db: Db;
+  photos: PhotoFiles;
   now: () => string;
   newId: () => string;
 }
 
-export function systemCtx(db: Db): Ctx {
+export function systemCtx(db: Db, photos: PhotoFiles): Ctx {
   return {
     db,
+    photos,
     now: () => new Date().toISOString(),
     newId: () => crypto.randomUUID(),
   };

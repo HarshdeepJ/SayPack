@@ -54,6 +54,11 @@ export default async function MovesPage() {
                   <Link href={`/moves/${move.id}`} className="btn flex-1">
                     Inventory
                   </Link>
+                  {move.roles.includes("reviewer") && (
+                    <Link href={`/moves/${move.id}/review`} className="btn flex-1">
+                      Review
+                    </Link>
+                  )}
                   {move.roles.some((r) => r === "mover" || r === "reviewer") && (
                     <Link href={`/moves/${move.id}/pack`} className="btn btn-primary flex-1">
                       Pack

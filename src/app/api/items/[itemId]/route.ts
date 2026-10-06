@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { getItem } from "@/domain/inventory";
+import { getItemDetail } from "@/domain/views";
 import { updateItem } from "@/domain/inventory-mutations";
-import { actionId, readJson, revision, route } from "@/server/http";
+import { actionId, revision, route } from "@/server/http";
 
 export const GET = route<{ itemId: string }>("item.get", ({ ctx, actor, params }) =>
-  getItem(ctx, actor, params.itemId),
+  getItemDetail(ctx, actor, params.itemId),
 );
 
 const Body = z.object({
@@ -16,7 +16,7 @@ const Body = z.object({
   valuable: z.boolean().optional(),
 });
 
-export const PATCH = route<{ itemId: string }>("item.update", async ({ request, ctx, actor, params }) => {
-  const { actionId: aid, ...changes } = await readJson(request, Body);
+export const PATCH = route<{ itemId: string }>("item.update", async ({ json, ctx, actor, params }) => {
+  const { actionId: aid, ...changes } = await json(Body);
   return updateItem(ctx, actor, aid, { itemId: params.itemId, ...changes });
 });

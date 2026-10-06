@@ -98,6 +98,92 @@ export interface SubmittedActionsTable {
   completed_at: string | null;
 }
 
+export type Stage = "packing" | "delivery";
+export type ObservedCondition = "no_visible_damage" | "existing_wear";
+export type IncidentStatus = "open" | "escalated" | "resolved";
+export type DecisionAction = "continue" | "repack" | "escalate" | "close";
+export type EvidenceRequestStatus = "open" | "fulfilled" | "cancelled";
+export type PhotoKind = "baseline" | "incident";
+
+export interface ConditionObservationsTable {
+  id: string;
+  move_id: string;
+  item_id: string;
+  stage: Stage;
+  condition: ObservedCondition;
+  note: string | null;
+  recorded_by: string;
+  created_at: string;
+}
+
+export interface DamageIncidentsTable {
+  id: string;
+  move_id: string;
+  item_id: string | null;
+  stage: Stage;
+  report: string;
+  status: IncidentStatus;
+  latest_decision: DecisionAction | null;
+  repacked_at: string | null;
+  repacked_by: string | null;
+  reported_by: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
+
+export interface HoldsTable {
+  id: string;
+  move_id: string;
+  item_id: string | null;
+  incident_id: string | null;
+  reason: string;
+  created_by: string;
+  created_at: string;
+  released_at: string | null;
+  released_by: string | null;
+  release_reason: string | null;
+  revision: number;
+}
+
+export interface EvidenceRequestsTable {
+  id: string;
+  move_id: string;
+  incident_id: string;
+  request_text: string;
+  status: EvidenceRequestStatus;
+  requested_by: string;
+  closed_by: string | null;
+  revision: number;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface DecisionsTable {
+  id: string;
+  incident_id: string;
+  reviewer_id: string;
+  action: DecisionAction;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface PhotosTable {
+  id: string;
+  move_id: string;
+  kind: PhotoKind;
+  item_id: string | null;
+  incident_id: string | null;
+  evidence_request_id: string | null;
+  storage_key: string;
+  media_type: string;
+  size_bytes: number;
+  sha256: string;
+  uploaded_by: string;
+  created_at: string;
+}
+
 export interface Schema {
   users: UsersTable;
   sessions: SessionsTable;
@@ -108,4 +194,10 @@ export interface Schema {
   items: ItemsTable;
   audit_events: AuditEventsTable;
   submitted_actions: SubmittedActionsTable;
+  condition_observations: ConditionObservationsTable;
+  damage_incidents: DamageIncidentsTable;
+  holds: HoldsTable;
+  evidence_requests: EvidenceRequestsTable;
+  decisions: DecisionsTable;
+  photos: PhotosTable;
 }

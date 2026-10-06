@@ -52,6 +52,10 @@ export interface Handled<P> {
   ctx: Ctx;
   actor: Actor;
   params: P;
+  /** Parses the JSON body and records its actionId in the request log. */
+  json: <T extends z.ZodType>(schema: T) => Promise<z.infer<T>>;
+  /** Adds fields (such as moveId or actionId) to this request's log line. */
+  note: (fields: { moveId?: string; actionId?: string }) => void;
 }
 
 type RouteArgs<P> = { params: Promise<P> };
@@ -71,6 +75,14 @@ export function route<P = Record<string, never>>(
     let actorId: string | undefined;
     let outcome = "ok";
     let status = 200;
+    const logFields: { moveId?: string; actionId?: string } = {};
+    const note = (fields: { moveId?: string; actionId?: string }) => Object.assign(logFields, fields);
+    const json = async <T extends z.ZodType>(schema: T): Promise<z.infer<T>> => {
+      const body = await readJson(request, schema);
+      const aid = (body as { actionId?: unknown })?.actionId;
+      if (typeof aid === "string") note({ actionId: aid });
+      return body;
+    };
     try {
       if (request.method !== "GET" && request.method !== "HEAD" && !sameOrigin(request)) {
         outcome = "bad_origin";
@@ -89,7 +101,9 @@ export function route<P = Record<string, never>>(
         actorId = actor.id;
       }
       const params = (await context.params) as P;
-      const result = await handler({ request, ctx, actor: actor as Actor, params });
+      const moveId = (params as { moveId?: unknown } | undefined)?.moveId;
+      if (typeof moveId === "string") note({ moveId });
+      const result = await handler({ request, ctx, actor: actor as Actor, params, json, note });
       return result instanceof Response ? ((status = result.status), result) : Response.json({ data: result });
     } catch (error) {
       if (error instanceof DomainError) {
@@ -126,6 +140,7 @@ export function route<P = Record<string, never>>(
           requestId,
           operation,
           actorId,
+          ...logFields,
           status,
           outcome,
           ms: Math.round(performance.now() - started),
@@ -157,5 +172,9 @@ export const id = z.string().min(1).max(64);
 
 /** Reads the actor for a server-rendered page; null when not signed in. */
 export async function pageActor(): Promise<Actor | null> {
-  return authenticate(appCtx(), (await cookies()).get(SESSION_COOKIE)?.value);
+  // Read the cookie first: during `next build` this marks the page dynamic before
+  // anything opens the database, so a build never touches live data.
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return authenticate(appCtx(), token);
 }

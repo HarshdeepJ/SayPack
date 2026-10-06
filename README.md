@@ -3,13 +3,13 @@
 > Unified Model Document (UMD) — proposed MVP specification.
 >
 > Working name: SayPack. The name can change without changing the product scope.
-> This document describes the intended system. Milestone 1 (manual inventory) is implemented; later milestones are not.
+> This document describes the intended system. Milestones 1 (manual inventory) and 2 (damage workflow) are implemented; later milestones are not.
 
 See [the Product Requirements Document](PRD.md) for prioritized requirements, system design, failure handling, and release criteria.
 
 ## Running locally
 
-Milestone 1 (manual inventory) is implemented. It needs Node.js 22 or later.
+Milestones 1 (manual inventory) and 2 (damage workflow: photos, incidents, holds, reviewer decisions) are implemented. It needs Node.js 22 or later.
 
 ```sh
 npm install
@@ -25,10 +25,13 @@ Sign in as the administrator, then use **Admin** to create users and moves and t
 | `npm run typecheck` | Generate Next.js route types and run TypeScript |
 | `npm run lint` | ESLint |
 | `npm run build && npm start` | Production build and server |
+| `npm run backup` | Consistent backup of the database and referenced photos to `backups/<timestamp>/`; safe while the app runs |
+| `npm run restore -- backups/<timestamp>` | Restore a backup; refuses while the app is running and moves current data aside first |
+| `npm run sweep-photos` | Delete photo files no database row references (crash leftovers older than an hour) |
 
-Data is stored in `data/saypack.db` (override with `SAYPACK_DB`). Session cookies are `Secure`; browsers accept them on `http://localhost` and over Tailscale HTTPS. To test from another plain-HTTP host, set `SAYPACK_INSECURE_COOKIES=1`. If a proxy rewrites the Host header, list the public origin in `SAYPACK_ALLOWED_ORIGINS` (comma-separated).
+Data is stored in `data/`: the database `saypack.db` and private photos under `photos/` (override the folder with `SAYPACK_DATA_DIR`, or each path with `SAYPACK_DB` and `SAYPACK_PHOTOS`; backups go to `SAYPACK_BACKUP_DIR`). Never copy or move `saypack.db` by hand while it has `-wal`/`-shm` files beside it; use `npm run backup` and `npm run restore`. Session cookies are `Secure`; browsers accept them on `http://localhost` and over Tailscale HTTPS. To test from another plain-HTTP host, set `SAYPACK_INSECURE_COOKIES=1`. If a proxy rewrites the Host header, list the public origin in `SAYPACK_ALLOWED_ORIGINS` (comma-separated).
 
-Code layout: `migrations/` holds the SQL schema, `src/domain/` the framework-independent business rules and their tests, `src/server/` the HTTP glue, and `src/app/` the pages and route handlers.
+Code layout: `migrations/` holds the SQL schema, `src/domain/` the framework-independent business rules and their tests, `src/storage/` file paths and the photo store, `src/server/` the HTTP glue, `src/app/` the pages and route handlers, and `scripts/` the admin, backup and restore commands.
 
 ## 1. Purpose
 

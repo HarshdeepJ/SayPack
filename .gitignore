@@ -42,3 +42,5 @@ next-env.d.ts
 
 # local data
 /data/
+/backups/
+/.next-verify/

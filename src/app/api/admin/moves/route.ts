@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createMove, listAllMoves } from "@/domain/moves";
-import { actionId, readJson, route } from "@/server/http";
+import { actionId, route } from "@/server/http";
 
 export const GET = route("move.list_all", ({ ctx, actor }) => listAllMoves(ctx, actor));
 
@@ -11,7 +11,7 @@ const Body = z.object({
   destination: z.string().max(200),
 });
 
-export const POST = route("move.create", async ({ request, ctx, actor }) => {
-  const { actionId: aid, ...input } = await readJson(request, Body);
+export const POST = route("move.create", async ({ json, ctx, actor }) => {
+  const { actionId: aid, ...input } = await json(Body);
   return createMove(ctx, actor, aid, input);
 });

@@ -124,6 +124,22 @@ export function ItemFlags({ fragile, valuable }: { fragile: boolean; valuable: b
   );
 }
 
+/** Packing state in words: hold, packed, missing baseline. */
+export function ItemStateBadges({
+  item,
+}: {
+  item: { status: string; onHold: boolean; baselineMissing: boolean; openIncidents: number };
+}) {
+  return (
+    <>
+      {item.onHold && <Badge tone="danger">On hold</Badge>}
+      {!item.onHold && item.openIncidents > 0 && <Badge tone="warn">Damage reported</Badge>}
+      {item.status === "packed" && <Badge tone="ok">Packed</Badge>}
+      {item.baselineMissing && <Badge tone="warn">Baseline missing</Badge>}
+    </>
+  );
+}
+
 export function formatTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
@@ -136,6 +152,25 @@ const ACTION_LABELS: Record<string, string> = {
   "box.sealed": "Sealed box",
   "box.reopened": "Reopened box",
   "room.created": "Created room",
+  "item.packed": "Marked packed",
+  "item.condition_recorded": "Recorded condition",
+  "item.damage_reported": "Damage reported",
+  "item.decision_recorded": "Reviewer decision",
+  "item.repacked": "Repacked",
+  "photo.baseline_added": "Added baseline photo",
+  "photo.incident_added": "Added damage photo",
+  "incident.reported": "Reported damage",
+  "incident.item_identified": "Identified damaged item",
+  "incident.repacked": "Recorded repack",
+  "incident.hold_released": "Released hold",
+  "incident.decided_continue": "Decided: continue",
+  "incident.decided_repack": "Decided: repack",
+  "incident.decided_escalate": "Decided: escalate",
+  "incident.decided_close": "Closed incident",
+  "evidence.requested": "Requested evidence",
+  "evidence.cancelled": "Cancelled evidence request",
+  "hold.move_placed": "Placed whole-move hold",
+  "hold.move_released": "Released whole-move hold",
 };
 
 export function actionLabel(action: string) {
@@ -149,7 +184,10 @@ export function describeChange(before: unknown, after: unknown): string {
   const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : typeof v === "boolean" ? (v ? "yes" : "no") : String(v));
   if ("boxLabel" in a || "boxLabel" in b) return `box: ${show(b.boxLabel ?? "none")} → ${show(a.boxLabel ?? "none")}`;
   if (!before) {
-    return [a.description, a.label, a.name].filter(Boolean).map(String).join(" ") || "";
+    return [a.description, a.label, a.name, a.report, a.requestText, a.reason, a.note]
+      .filter(Boolean)
+      .map(String)
+      .join(" · ");
   }
   return Object.keys(a)
     .map((k) => `${k}: ${show(b[k])} → ${show(a[k])}`)

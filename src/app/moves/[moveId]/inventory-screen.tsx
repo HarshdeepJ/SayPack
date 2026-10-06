@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { BoxStatusBadge, ItemFlags } from "@/components/ui";
+import { MoveHoldBanner } from "@/components/evidence";
+import { BoxStatusBadge, ItemFlags, ItemStateBadges } from "@/components/ui";
 import { ItemPanel } from "@/components/item-panel";
 import { apiGet, usePolling } from "@/lib/client-api";
 import type { ItemView, MoveOverview } from "@/lib/types";
 
-type Filter = { kind: "all" } | { kind: "box"; id: string } | { kind: "room"; id: string } | { kind: "unboxed" };
+type Filter =
+  | { kind: "all" }
+  | { kind: "box"; id: string }
+  | { kind: "room"; id: string }
+  | { kind: "unboxed" }
+  | { kind: "held" };
 
 const PAGE = 50;
 
@@ -28,6 +34,7 @@ export function InventoryScreen({ initialOverview }: { initialOverview: MoveOver
     if (filter.kind === "box") params.set("boxId", filter.id);
     if (filter.kind === "room") params.set("roomId", filter.id);
     if (filter.kind === "unboxed") params.set("unboxed", "1");
+    if (filter.kind === "held") params.set("held", "1");
     const [ov, list] = await Promise.all([
       apiGet<MoveOverview>(`/api/moves/${moveId}`),
       apiGet<{ items: ItemView[]; hasMore: boolean }>(`/api/moves/${moveId}/items?${params}`),
@@ -49,7 +56,9 @@ export function InventoryScreen({ initialOverview }: { initialOverview: MoveOver
         ? overview.rooms.find((r) => r.id === filter.id)?.name
         : filter.kind === "unboxed"
           ? "Not in a box"
-          : null;
+          : filter.kind === "held"
+            ? "Items on hold"
+            : null;
 
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_20rem]">
@@ -61,10 +70,31 @@ export function InventoryScreen({ initialOverview }: { initialOverview: MoveOver
           <span className="text-sm text-muted">
             {overview.itemCount} items · {overview.boxes.length} boxes
           </span>
-          {overview.canWrite && (
-            <Link href={`/moves/${moveId}/pack`} className="btn btn-primary ml-auto">
-              Pack
-            </Link>
+          <span className="ml-auto flex gap-2">
+            {overview.canReview && (
+              <Link href={`/moves/${moveId}/review`} className="btn">
+                Review{overview.openIncidents > 0 ? ` (${overview.openIncidents})` : ""}
+              </Link>
+            )}
+            {overview.canWrite && (
+              <Link href={`/moves/${moveId}/pack`} className="btn btn-primary">
+                Pack
+              </Link>
+            )}
+          </span>
+        </div>
+
+        <div className="mb-3 space-y-2">
+          <MoveHoldBanner holds={overview.moveHolds} />
+          {overview.openIncidents > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilter({ kind: "held" })}
+              className="w-full rounded-lg bg-warn-bg px-3 py-2 text-left text-sm text-warn"
+            >
+              {overview.openIncidents} open damage report{overview.openIncidents === 1 ? "" : "s"}
+              {overview.unidentifiedIncidents > 0 ? ` (${overview.unidentifiedIncidents} item unidentified)` : ""}. Show items on hold →
+            </button>
           )}
         </div>
 
@@ -111,6 +141,7 @@ export function InventoryScreen({ initialOverview }: { initialOverview: MoveOver
                 >
                   <span className="min-w-0 flex-1 font-medium">{item.description}</span>
                   <ItemFlags fragile={item.fragile} valuable={item.valuable} />
+                  <ItemStateBadges item={item} />
                   <span className="text-sm text-muted">
                     {item.boxLabel ? `Box ${item.boxLabel}` : "No box"}
                     {item.roomName ? ` · ${item.roomName}` : ""}

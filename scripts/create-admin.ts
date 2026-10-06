@@ -1,12 +1,13 @@
 // Creates an administrator account. Usage:
 //   npm run create-admin -- --email you@example.com --name "Your Name"
 // The password is read from SAYPACK_ADMIN_PASSWORD, or prompted for.
-import path from "node:path";
 import readline from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { openDatabase } from "@/db/database";
 import { DomainError, systemCtx } from "@/domain/core";
 import { createUser, hashPassword } from "@/domain/identity";
+import { DB_PATH, PHOTO_ROOT } from "@/storage/paths";
+import { PhotoStore } from "@/storage/photo-store";
 
 async function main() {
   const { values } = parseArgs({
@@ -24,8 +25,8 @@ async function main() {
     rl.close();
   }
 
-  const dbPath = process.env.SAYPACK_DB ?? path.join(process.cwd(), "data", "saypack.db");
-  const ctx = systemCtx(openDatabase(dbPath));
+  const ctx = systemCtx(openDatabase(DB_PATH), new PhotoStore(PHOTO_ROOT));
+  const dbPath = DB_PATH;
   try {
     const user = createUser(ctx, null, null, {
       email: values.email,

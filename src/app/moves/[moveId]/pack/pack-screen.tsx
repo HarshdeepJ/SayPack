@@ -1,17 +1,21 @@
 "use client";
 
 import { useCallback, useRef, useState, type FormEvent } from "react";
+import { MoveHoldBanner, ReportDamageForm } from "@/components/evidence";
+import { IncidentPanel } from "@/components/incident-panel";
 import { ItemPanel } from "@/components/item-panel";
 import {
   BoxStatusBadge,
   ItemFlags,
+  ItemStateBadges,
   SaveStatus,
   actionLabel,
   describeChange,
   formatTime,
 } from "@/components/ui";
 import { apiGet, apiSend, useCommand, useLocalValue, usePolling } from "@/lib/client-api";
-import type { ActivityEntry, BoxView, ItemView, MoveOverview, RoomView } from "@/lib/types";
+import { nextStep } from "@/lib/incident-text";
+import type { ActivityEntry, BoxView, IncidentSummary, ItemView, MoveOverview, RoomView } from "@/lib/types";
 
 interface Selection {
   roomId: string;
@@ -45,6 +49,9 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
   const [contents, setContents] = useState<ItemView[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [incidents, setIncidents] = useState<IncidentSummary[]>([]);
+  const [openIncident, setOpenIncident] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
   const [lastSaved, setLastSaved] = useState<ItemView | null>(null);
   const descriptionRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -55,15 +62,17 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
   const roomBoxes = roomId ? overview.boxes.filter((b) => b.roomId === roomId) : overview.boxes;
 
   const load = useCallback(async () => {
-    const [ov, act, box] = await Promise.all([
+    const [ov, act, box, inc] = await Promise.all([
       apiGet<MoveOverview>(`/api/moves/${moveId}`),
       apiGet<ActivityEntry[]>(`/api/moves/${moveId}/activity?mine=1&limit=10`),
       boxId
         ? apiGet<{ items: ItemView[] }>(`/api/moves/${moveId}/items?boxId=${boxId}&limit=100`)
         : Promise.resolve(null),
+      apiGet<IncidentSummary[]>(`/api/moves/${moveId}/incidents`),
     ]);
     if (ov.ok) setOverview(ov.data);
     if (act.ok) setActivity(act.data);
+    if (inc.ok) setIncidents(inc.data);
     setContents(box?.ok ? box.data.items : []);
   }, [moveId, boxId]);
 
@@ -116,6 +125,31 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
   return (
     <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-4 lg:grid-cols-[1fr_22rem]">
       <div className="min-w-0 space-y-4">
+        <MoveHoldBanner holds={overview.moveHolds} />
+
+        {incidents.length > 0 && (
+          <section aria-labelledby="attention-heading" className="card space-y-2 border-danger p-4">
+            <h2 id="attention-heading" className="font-semibold text-danger">
+              Needs attention ({incidents.length})
+            </h2>
+            <ul className="divide-y divide-border">
+              {incidents.map((incident) => (
+                <li key={incident.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenIncident(incident.id)}
+                    className="w-full py-2 text-left text-sm"
+                  >
+                    <span className="font-medium">{incident.itemDescription ?? "Unidentified item"}</span>
+                    {incident.boxLabel && <span className="text-muted"> · Box {incident.boxLabel}</span>}
+                    <span className="block">{nextStep(incident)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section aria-labelledby="context-heading" className="card space-y-3 p-4">
           <h1 id="context-heading" className="sr-only">
             Packing context
@@ -256,9 +290,9 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
           )}
 
           {activeBox && contents.length > 0 && (
-            <details className="mt-4">
+            <details className="mt-4" open>
               <summary className="cursor-pointer text-sm font-medium">
-                In this box ({contents.length})
+                In this box ({contents.length}) — tap an item to photograph, pack or report damage
               </summary>
               <ul className="mt-2 divide-y divide-border text-sm">
                 {contents.map((item) => (
@@ -266,10 +300,11 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
                     <button
                       type="button"
                       onClick={() => setSelected(item.id)}
-                      className="flex w-full items-center gap-2 py-2 text-left"
+                      className="flex w-full flex-wrap items-center gap-2 py-2 text-left"
                     >
                       <span className="flex-1">{item.description}</span>
                       <ItemFlags fragile={item.fragile} valuable={item.valuable} />
+                      <ItemStateBadges item={item} />
                     </button>
                   </li>
                 ))}
@@ -277,6 +312,20 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
             </details>
           )}
         </section>
+
+        {reporting ? (
+          <ReportDamageForm
+            moveId={moveId}
+            itemId={null}
+            itemLabel={null}
+            onReported={() => void load()}
+            onCancel={() => setReporting(false)}
+          />
+        ) : (
+          <button type="button" className="btn w-full border-danger text-danger" onClick={() => setReporting(true)}>
+            Report damage (not sure which item)
+          </button>
+        )}
       </div>
 
       <aside aria-labelledby="recent-heading">
@@ -313,6 +362,9 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
           onClose={() => setSelected(null)}
           onChanged={load}
         />
+      )}
+      {openIncident && (
+        <IncidentPanel incidentId={openIncident} onClose={() => setOpenIncident(null)} onChanged={load} />
       )}
     </main>
   );

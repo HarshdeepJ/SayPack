@@ -7,6 +7,16 @@ export type {
   BoxView,
   HistoryEntry,
   ItemView,
+  MoveHoldBrief,
   MoveOverview,
   RoomView,
 } from "@/domain/inventory";
+export type { ObservationView, PhotoView } from "@/domain/evidence";
+export type {
+  DecisionView,
+  EvidenceRequestView,
+  HoldView,
+  IncidentDetail,
+  IncidentSummary,
+} from "@/domain/incidents";
+export type { ItemDetail } from "@/domain/views";

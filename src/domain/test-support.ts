@@ -6,11 +6,19 @@ import { DomainError, type Actor, type Ctx } from "./core";
 import { createUser } from "./identity";
 import { addMember, createMove } from "./moves";
 
+export interface TestCtx extends Ctx {
+  /** Storage keys whose files are "missing from disk". Every other key exists. */
+  missingPhotos: Set<string>;
+}
+
 /** Fresh in-memory database with a clock that advances 1 second per call. */
-export function testCtx(): Ctx {
+export function testCtx(): TestCtx {
   let t = Date.parse("2026-10-06T00:00:00.000Z");
+  const missingPhotos = new Set<string>();
   return {
     db: openDatabase(":memory:"),
+    photos: { exists: (key) => !missingPhotos.has(key) },
+    missingPhotos,
     now: () => new Date((t += 1000)).toISOString(),
     newId: () => crypto.randomUUID(),
   };

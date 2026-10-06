@@ -68,6 +68,31 @@ export function runAction<T>(
   });
 }
 
+/**
+ * Checks for an earlier submission without running anything. Uploads call this
+ * before writing a file, so a retried upload does not store the photo twice.
+ * Returns the recorded outcome for a matching replay, or null when the ID is new.
+ */
+export function peekAction<T>(ctx: Ctx, actor: Actor, request: ActionRequest): T | null {
+  const { db } = ctx;
+  const existing = db.get(
+    db.q.selectFrom("submitted_actions").selectAll().where("action_id", "=", request.actionId),
+  );
+  if (!existing) return null;
+  const payloadHash = sha256(stableStringify({ op: request.operation, f: request.fingerprint }));
+  if (
+    existing.user_id !== actor.id ||
+    existing.operation !== request.operation ||
+    existing.payload_hash !== payloadHash
+  ) {
+    throw new DomainError("conflict", "action_id_reused", "This action ID was already used for a different request.");
+  }
+  if (existing.status !== "committed" || existing.outcome_json === null) {
+    throw new DomainError("conflict", "action_in_progress", "This action is still being processed.");
+  }
+  return JSON.parse(existing.outcome_json) as T;
+}
+
 export function recordAudit(
   ctx: Ctx,
   event: {

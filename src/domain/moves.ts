@@ -3,11 +3,11 @@ import { recordAudit, runAction } from "./actions";
 import { DomainError, forbidden, invalid, notFound, type Actor, type Ctx } from "./core";
 import { requireAdmin } from "./identity";
 
-export type MovePermission = "inventory.read" | "inventory.write";
+export type MovePermission = "inventory.read" | "inventory.write" | "incident.review";
 
 const ROLE_PERMISSIONS: Record<MoveRole, readonly MovePermission[]> = {
   mover: ["inventory.read", "inventory.write"],
-  reviewer: ["inventory.read", "inventory.write"],
+  reviewer: ["inventory.read", "inventory.write", "incident.review"],
   owner: ["inventory.read"],
 };
 
