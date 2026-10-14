@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "create-admin": "tsx scripts/create-admin.ts",
+    "reset-password": "tsx scripts/reset-password.ts",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
     "sweep-photos": "tsx scripts/sweep-photos.ts",

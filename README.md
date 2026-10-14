@@ -25,6 +25,7 @@ Sign in as the administrator, then use **Admin** to create users and moves and t
 | `npm run typecheck` | Generate Next.js route types and run TypeScript |
 | `npm run lint` | ESLint |
 | `npm run build && npm start` | Production build and server |
+| `npm run reset-password -- --email <email>` | Set a new password for a user who forgot theirs (prompts for it) and end their sessions |
 | `npm run backup` | Consistent backup of the database and referenced photos to `backups/<timestamp>/`; safe while the app runs |
 | `npm run restore -- backups/<timestamp>` | Restore a backup; refuses while the app is running and moves current data aside first |
 | `npm run sweep-photos` | Delete photo files no database row references (crash leftovers older than an hour) |
