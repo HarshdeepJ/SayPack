@@ -45,3 +45,18 @@ next-env.d.ts
 /backups/
 /.next-verify/
 !.env.example
+
+
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/crash.log
+**/crash.*.log
+**/*.tfvars
+**/*.tfvars.json
+**/*terraform*.zip
+
+# Keep provider dependency lockfiles
+!**/.terraform.lock.hcl
