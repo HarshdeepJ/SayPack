@@ -225,3 +225,32 @@ export function setUserActive(
     },
   ).outcome;
 }
+
+/**
+ * Sets a new password from the command line (scripts/reset-password.ts), for someone
+ * locked out, including the last administrator. Ends the user's existing sessions.
+ */
+export function resetPassword(ctx: Ctx, input: { email: string; passwordHash: string }): UserSummary {
+  const email = normalizeEmail(input.email);
+  return ctx.db.transaction(() => {
+    const { db } = ctx;
+    const user = db.get(db.q.selectFrom("users").selectAll().where("email", "=", email));
+    if (!user) throw notFound("User");
+    db.run(db.q.updateTable("users").set({ password_hash: input.passwordHash }).where("id", "=", user.id));
+    db.run(
+      db.q
+        .updateTable("sessions")
+        .set({ revoked_at: ctx.now() })
+        .where("user_id", "=", user.id)
+        .where("revoked_at", "is", null),
+    );
+    recordAudit(ctx, {
+      moveId: null,
+      actorId: user.id,
+      action: "user.password_reset",
+      recordType: "user",
+      recordId: user.id,
+    });
+    return toUserSummary(user);
+  });
+}

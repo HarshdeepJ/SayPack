@@ -1,0 +1,64 @@
+# Local container run:  docker compose up --build -d   -> https://localhost:8443
+# Maintenance scripts:  docker compose run --rm tools <script> [args]
+#
+# ${NAME:-default} values come from a .env file beside this one (never
+# committed). Locally there is none and the defaults apply; on the VM, .env sets
+# the public domain and the standard ports.
+services:
+  app:
+    build: .
+    image: saypack:local
+    restart: unless-stopped
+    # No ports: only Caddy, on the same Compose network, can reach the app (as app:3000).
+    # Optional settings (e.g. SAYPACK_AI_PROVIDER=gemini and GEMINI_API_KEY).
+    # Read when the container starts, never baked into the image.
+    env_file:
+      - path: .env.docker
+        required: false
+    volumes:
+      - saypack-data:/app/data
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    # Locally: 127.0.0.1 keeps it off the network, and 8080/8443 avoid the 443
+    # that `tailscale serve` holds. The VM's .env sets 0.0.0.0, 80 and 443.
+    # HTTPS uses the same port inside and out, because Caddy writes it into
+    # redirects (see Caddyfile).
+    ports:
+      - "${SAYPACK_BIND:-127.0.0.1}:${SAYPACK_HTTP_PORT:-8080}:80"
+      - "${SAYPACK_BIND:-127.0.0.1}:${SAYPACK_HTTPS_PORT:-8443}:${SAYPACK_HTTPS_PORT:-8443}"
+      - "${SAYPACK_BIND:-127.0.0.1}:${SAYPACK_HTTPS_PORT:-8443}:${SAYPACK_HTTPS_PORT:-8443}/udp" # HTTP/3
+    environment:
+      SAYPACK_DOMAIN: ${SAYPACK_DOMAIN:-localhost}
+      SAYPACK_HTTPS_PORT: ${SAYPACK_HTTPS_PORT:-8443}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and keys. Keeping them avoids re-requesting certificates on
+      # every restart, which Let's Encrypt rate-limits.
+      - caddy-data:/data
+      - caddy-config:/config
+
+  tools:
+    build:
+      context: .
+      target: tools
+    image: saypack-tools:local
+    # Profiles keep this out of `docker compose up`; it runs only on demand.
+    profiles: [tools]
+    env_file:
+      - path: .env.docker
+        required: false
+    volumes:
+      - saypack-data:/app/data
+      - ./backups:/app/backups
+
+# A named volume is managed by Docker and outlives containers: `down` keeps it,
+# `down -v` deletes it (and every move, item and photo with it).
+volumes:
+  saypack-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,26 @@
+# Everything listed here stays out of the build context: smaller uploads to the
+# Docker engine, faster builds, and no secrets or Windows binaries in the image.
+
+# Installed and built inside the image, for Linux
+node_modules
+.next
+.next-verify
+*.tsbuildinfo
+next-env.d.ts
+
+# Runtime state lives in volumes, never in the image
+data
+backups
+
+# Secrets
+.env*
+!.env.example
+
+# Not needed to build
+.git
+.github
+infra
+*.md
+Dockerfile
+compose*.yaml
+Caddyfile

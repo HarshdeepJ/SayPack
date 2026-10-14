@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { authenticate, createUser, hashPassword, login, logout, setUserActive } from "./identity";
+import {
+  authenticate,
+  createUser,
+  hashPassword,
+  login,
+  logout,
+  resetPassword,
+  setUserActive,
+} from "./identity";
 import { addMember, listMyMoves } from "./moves";
 import { aid, expectDomainError, makeUser, moveFixture, testCtx } from "./test-support";
 
@@ -53,6 +61,28 @@ describe("sessions", () => {
     await expect(login(ctx, "m@example.test", "correct horse")).rejects.toMatchObject({
       code: "unauthenticated",
     });
+  });
+
+  it("resetting a password replaces it and ends existing sessions", async () => {
+    const ctx = testCtx();
+    createUser(ctx, null, null, {
+      email: "m@example.test",
+      displayName: "M",
+      passwordHash: await hashPassword("forgotten one"),
+      isAdmin: false,
+    });
+    const { token } = await login(ctx, "m@example.test", "forgotten one");
+
+    resetPassword(ctx, { email: " M@example.TEST ", passwordHash: await hashPassword("brand new one") });
+    expect(authenticate(ctx, token)).toBeNull();
+    await expect(login(ctx, "m@example.test", "forgotten one")).rejects.toMatchObject({
+      reason: "bad_credentials",
+    });
+    await expect(login(ctx, "m@example.test", "brand new one")).resolves.toBeTruthy();
+    expectDomainError(
+      () => resetPassword(ctx, { email: "nobody@example.test", passwordHash: "x" }),
+      "not_found",
+    );
   });
 
   it("rejects short passwords", async () => {

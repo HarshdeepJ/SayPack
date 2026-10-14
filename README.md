@@ -25,10 +25,24 @@ Sign in as the administrator, then use **Admin** to create users and moves and t
 | `npm run typecheck` | Generate Next.js route types and run TypeScript |
 | `npm run lint` | ESLint |
 | `npm run build && npm start` | Production build and server |
+| `npm run reset-password -- --email <email>` | Set a new password for a user who forgot theirs (prompts for it) and end their sessions |
 | `npm run backup` | Consistent backup of the database and referenced photos to `backups/<timestamp>/`; safe while the app runs |
 | `npm run restore -- backups/<timestamp>` | Restore a backup; refuses while the app is running and moves current data aside first |
 | `npm run sweep-photos` | Delete photo files no database row references (crash leftovers older than an hour) |
 | `npm run gemini-check -- "<command>"` | One real Gemini call outside the app's allowance; add `--photo <file>` to test a damage photo check |
+
+### Running in Docker
+
+```sh
+docker compose up --build -d                                                   # https://localhost:8443
+docker compose run --rm tools create-admin -- --email you@example.com --name "Your Name"
+docker compose run --rm tools backup                                          # writes to ./backups/
+docker compose logs -f app caddy
+```
+
+Caddy serves HTTPS in front of the app, whose own port is not published. Locally it signs a certificate with its own authority, so the browser warns once; on a server, set `SAYPACK_DOMAIN`, `SAYPACK_BIND=0.0.0.0`, `SAYPACK_HTTP_PORT=80` and `SAYPACK_HTTPS_PORT=443` in `.env` and it gets a Let's Encrypt certificate.
+
+The database and photos live in the `saypack-data` volume, separate from the `data/` folder `npm start` uses. `docker compose down` keeps the volume; `down -v` deletes it. Optional settings such as `SAYPACK_AI_PROVIDER` go in `.env.docker` (never committed).
 
 ### Voice and the AI budget
 
