@@ -1,0 +1,37 @@
+# Local container run:  docker compose up --build
+# Maintenance scripts:  docker compose run --rm tools <script> [args]
+services:
+  app:
+    build: .
+    image: saypack:local
+    restart: unless-stopped
+    # 127.0.0.1 publishes the port to this computer only, not the local network.
+    # 3001, so it can run beside `npm start` on 3000.
+    ports:
+      - "127.0.0.1:3001:3000"
+    # Optional settings (e.g. SAYPACK_AI_PROVIDER=gemini and GEMINI_API_KEY).
+    # Read when the container starts, never baked into the image.
+    env_file:
+      - path: .env.docker
+        required: false
+    volumes:
+      - saypack-data:/app/data
+
+  tools:
+    build:
+      context: .
+      target: tools
+    image: saypack-tools:local
+    # Profiles keep this out of `docker compose up`; it runs only on demand.
+    profiles: [tools]
+    env_file:
+      - path: .env.docker
+        required: false
+    volumes:
+      - saypack-data:/app/data
+      - ./backups:/app/backups
+
+# A named volume is managed by Docker and outlives containers: `down` keeps it,
+# `down -v` deletes it (and every move, item and photo with it).
+volumes:
+  saypack-data:

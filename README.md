@@ -30,6 +30,17 @@ Sign in as the administrator, then use **Admin** to create users and moves and t
 | `npm run sweep-photos` | Delete photo files no database row references (crash leftovers older than an hour) |
 | `npm run gemini-check -- "<command>"` | One real Gemini call outside the app's allowance; add `--photo <file>` to test a damage photo check |
 
+### Running in Docker
+
+```sh
+docker compose up --build -d                                                   # http://localhost:3001
+docker compose run --rm tools create-admin -- --email you@example.com --name "Your Name"
+docker compose run --rm tools backup                                          # writes to ./backups/
+docker compose logs -f app
+```
+
+The database and photos live in the `saypack-data` volume, separate from the `data/` folder `npm start` uses. `docker compose down` keeps the volume; `down -v` deletes it. Optional settings such as `SAYPACK_AI_PROVIDER` go in `.env.docker` (never committed).
+
 ### Voice and the AI budget
 
 Voice runs on a free mock until real Gemini is switched on. The mock understands typed commands such as "Blue vase, box A, fragile, no visible damage", "move blue vase to box B" and "damage blue vase: crack on rim". To use Gemini, copy `.env.example` to `.env.local`, set `SAYPACK_AI_PROVIDER=gemini` and `GEMINI_API_KEY`, and restart. Make one test command and check the admin page's AI usage card before relying on it.
