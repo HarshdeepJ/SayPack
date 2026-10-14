@@ -17,7 +17,13 @@ export function testCtx(): TestCtx {
   const missingPhotos = new Set<string>();
   return {
     db: openDatabase(":memory:"),
-    photos: { exists: (key) => !missingPhotos.has(key) },
+    photos: {
+      exists: (key) => !missingPhotos.has(key),
+      read: async (key) => {
+        if (missingPhotos.has(key)) throw new Error(`missing ${key}`);
+        return new TextEncoder().encode(`photo:${key}`);
+      },
+    },
     missingPhotos,
     now: () => new Date((t += 1000)).toISOString(),
     newId: () => crypto.randomUUID(),

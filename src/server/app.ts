@@ -1,11 +1,19 @@
 import "server-only";
+import { createProvider } from "@/ai/provider";
 import { openDatabase, type Db } from "@/db/database";
+import type { AiProvider } from "@/domain/ai";
 import { systemCtx, type Ctx } from "@/domain/core";
 import { PhotoStore } from "@/storage/photo-store";
 import { DB_PATH, PHOTO_ROOT } from "@/storage/paths";
 
 // One connection per process; kept on globalThis so dev hot reloads don't open more.
-const globalForDb = globalThis as unknown as { saypackDb?: Db; saypackPhotos?: PhotoStore };
+const globalForDb = globalThis as unknown as { saypackDb?: Db; saypackPhotos?: PhotoStore; saypackAi?: AiProvider };
+
+/** Mock unless SAYPACK_AI_PROVIDER=gemini and GEMINI_API_KEY are set. */
+export function aiProvider(): AiProvider {
+  globalForDb.saypackAi ??= createProvider();
+  return globalForDb.saypackAi;
+}
 
 export function photoStore(): PhotoStore {
   globalForDb.saypackPhotos ??= new PhotoStore(PHOTO_ROOT);

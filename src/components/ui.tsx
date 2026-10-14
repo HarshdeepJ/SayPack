@@ -167,6 +167,8 @@ const ACTION_LABELS: Record<string, string> = {
   "incident.decided_repack": "Decided: repack",
   "incident.decided_escalate": "Decided: escalate",
   "incident.decided_close": "Closed incident",
+  "incident.ai_assessed": "AI checked damage photo",
+  "incident.ai_assessment_failed": "AI photo check failed",
   "evidence.requested": "Requested evidence",
   "evidence.cancelled": "Cancelled evidence request",
   "hold.move_placed": "Placed whole-move hold",

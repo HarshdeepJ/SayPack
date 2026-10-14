@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import { DamagePhotoCheck } from "@/components/damage-check";
 import { SaveStatus, formatTime } from "@/components/ui";
 import { apiSend, apiUpload, preparePhoto, useCommand } from "@/lib/client-api";
 import type { HoldView, IncidentSummary, MoveHoldBrief, PhotoView } from "@/lib/types";
@@ -133,11 +134,7 @@ export function ReportDamageForm({
         {!saved.itemId && (
           <p className="text-sm text-muted">No item was selected, so a reviewer will identify it.</p>
         )}
-        <PhotoUpload
-          target={{ kind: "incident", incidentId: saved.id }}
-          label="Add a photo of the damage"
-          onUploaded={() => undefined}
-        />
+        <DamagePhotoCheck incidentId={saved.id} label="Add a photo of the damage" />
         <button type="button" className="btn w-full" onClick={onCancel}>
           Done
         </button>

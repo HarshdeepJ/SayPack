@@ -29,6 +29,13 @@ export const STATUS_LABEL: Record<string, string> = {
   resolved: "Resolved",
 };
 
+/** How the latest AI photo check is labelled. It describes the photo; it never decides. */
+export const AI_VERDICT_BADGE: Record<string, { text: string; tone: "danger" | "warn" | "ok" }> = {
+  damage_visible: { text: "AI: damage visible", tone: "danger" },
+  no_damage_visible: { text: "AI: no damage seen", tone: "ok" },
+  inconclusive: { text: "AI: photo unclear", tone: "warn" },
+};
+
 /** Queue badges derived from the incident's records. */
 export function incidentBadges(incident: IncidentSummary): { text: string; tone: "danger" | "warn" | "neutral" | "ok" }[] {
   const badges: { text: string; tone: "danger" | "warn" | "neutral" | "ok" }[] = [];
@@ -40,6 +47,7 @@ export function incidentBadges(incident: IncidentSummary): { text: string; tone:
   if (incident.latestDecision === "repack") {
     badges.push(incident.repackedAt ? { text: "Repacked, release pending", tone: "warn" } : { text: "Repack requested", tone: "warn" });
   }
+  if (incident.aiVerdict) badges.push(AI_VERDICT_BADGE[incident.aiVerdict]);
   if (!incident.latestDecision) badges.push({ text: "Needs decision", tone: "warn" });
   return badges;
 }

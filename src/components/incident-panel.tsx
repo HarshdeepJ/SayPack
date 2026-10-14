@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { PhotoGrid, PhotoUpload } from "@/components/evidence";
+import { AssessmentCard, DamagePhotoCheck } from "@/components/damage-check";
+import { PhotoGrid } from "@/components/evidence";
 import { Badge, SaveStatus, formatTime } from "@/components/ui";
 import { apiGet, apiSend, useCommand, usePolling, type ApiError } from "@/lib/client-api";
 import { DECISION_LABEL, STATUS_LABEL, incidentBadges, nextStep } from "@/lib/incident-text";
-import type { IncidentDetail, IncidentSummary, ItemView } from "@/lib/types";
+import type { AssessmentView, IncidentDetail, IncidentSummary, ItemView } from "@/lib/types";
 
 type Decision = "continue" | "repack" | "escalate" | "close";
 
@@ -153,15 +154,34 @@ export function IncidentPanel({
                     <PhotoGrid photos={detail.incidentPhotos} empty="No damage photos yet." />
                   </div>
                 </div>
-                <p className="text-xs text-muted">
-                  AI assessment arrives in a later milestone. Photos cannot show when or how damage happened.
-                </p>
                 {!resolved && detail.canWrite && openRequests.length === 0 && (
-                  <PhotoUpload
-                    target={{ kind: "incident", incidentId: incident.id }}
-                    label="Add damage photo"
-                    onUploaded={changed}
-                  />
+                  <DamagePhotoCheck incidentId={incident.id} label="Add damage photo" showResult={false} onChanged={changed} />
+                )}
+              </section>
+
+              <section aria-labelledby="ai-heading" className="space-y-2">
+                <h3 id="ai-heading" className="font-semibold">
+                  AI photo check
+                </h3>
+                <p className="text-xs text-muted">
+                  The AI describes what the photos show. It cannot tell when, how or by whom damage happened, and it never
+                  releases a hold. {detail.canReview ? "You decide." : "A reviewer decides."}
+                </p>
+                {detail.assessments.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    {detail.incidentPhotos.length === 0 ? "Runs when a damage photo is added." : "Not checked yet."}
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {detail.assessments.map((a) => (
+                      <li key={a.id}>
+                        <AssessmentCard assessment={a} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!resolved && detail.canWrite && detail.incidentPhotos.length > 0 && (
+                  <RecheckButton incidentId={incident.id} onDone={changed} />
                 )}
               </section>
 
@@ -183,10 +203,12 @@ export function IncidentPanel({
                           </span>
                         </p>
                         {r.status === "open" && detail.canWrite && (
-                          <PhotoUpload
-                            target={{ kind: "incident", incidentId: incident.id, evidenceRequestId: r.id }}
+                          <DamagePhotoCheck
+                            incidentId={incident.id}
+                            evidenceRequestId={r.id}
                             label="Upload requested photo"
-                            onUploaded={changed}
+                            showResult={false}
+                            onChanged={changed}
                           />
                         )}
                         {r.status === "open" && detail.canReview && (
@@ -481,5 +503,21 @@ function IdentifyItem({
       )}
       <SaveStatus status={identify.status} error={identify.error} onRetry={identify.retry} savedText="Item identified and put on hold." />
     </section>
+  );
+}
+
+/** Runs the AI check again on the newest photos, e.g. after a failed or unclear check. */
+function RecheckButton({ incidentId, onDone }: { incidentId: string; onDone: () => void }) {
+  const check = useCommand(
+    (actionId: string) => apiSend<AssessmentView>("POST", `/api/incidents/${incidentId}/assessments`, { actionId }),
+    { onSaved: onDone },
+  );
+  return (
+    <div className="space-y-1">
+      <button type="button" className="btn w-full" disabled={check.saving} onClick={() => void check.run(null)}>
+        {check.saving ? "Checking…" : "Check photos with AI again"}
+      </button>
+      <SaveStatus status={check.status === "saved" ? "idle" : check.status} error={check.error} onRetry={check.retry} />
+    </div>
   );
 }

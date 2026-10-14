@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, type FormEvent } from "react";
 import { MoveHoldBanner, ReportDamageForm } from "@/components/evidence";
 import { IncidentPanel } from "@/components/incident-panel";
 import { ItemPanel } from "@/components/item-panel";
+import { VoicePanel } from "@/components/voice-panel";
 import {
   BoxStatusBadge,
   ItemFlags,
@@ -211,6 +212,14 @@ export function PackScreen({ initialOverview }: { initialOverview: MoveOverview 
             />
           </div>
         </section>
+
+        {/* Keyed by box: switching boxes discards any proposal made for the previous one. */}
+        <VoicePanel
+          key={activeBox?.id ?? "no-box"}
+          moveId={moveId}
+          activeBox={activeBox ? { id: activeBox.id, label: activeBox.label } : null}
+          onSaved={() => void load()}
+        />
 
         <section aria-labelledby="active-box-heading" className="card p-4">
           <div className="flex flex-wrap items-center gap-2">

@@ -4,6 +4,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import { Badge, SaveStatus } from "@/components/ui";
 import { apiGet, apiSend, useCommand, usePolling } from "@/lib/client-api";
 import type { AdminMoveSummary, UserSummary } from "@/lib/types";
+import { AiUsageCard } from "./ai-usage";
 
 type Role = "mover" | "reviewer" | "owner";
 
@@ -107,6 +108,7 @@ export function AdminScreen({ selfId }: { selfId: string }) {
       </section>
 
       <section aria-labelledby="users-heading" className="space-y-4">
+        <AiUsageCard />
         <h2 id="users-heading" className="text-xl font-semibold">
           Users
         </h2>

@@ -1,5 +1,6 @@
-import type { DecisionAction, EvidenceRequestStatus, IncidentStatus, Stage } from "@/db/schema";
+import type { AssessmentVerdict, DecisionAction, EvidenceRequestStatus, IncidentStatus, Stage } from "@/db/schema";
 import { recordAudit, runAction } from "./actions";
+import { listAssessments, type AssessmentView } from "./assessment";
 import { DomainError, invalid, notFound, staleRevision, type Actor, type Ctx } from "./core";
 import { listIncidentPhotos, listItemBaselinePhotos, type PhotoView } from "./evidence";
 import { cleanOptional, cleanText, getItemRow, toItemView, type ItemView } from "./inventory";
@@ -26,6 +27,8 @@ export interface IncidentSummary {
   openEvidenceRequests: number;
   /** This incident's item hold is still active. */
   holdActive: boolean;
+  /** Latest completed AI photo check, if any. An observation, never a decision. */
+  aiVerdict: AssessmentVerdict | null;
   revision: number;
   createdAt: string;
   updatedAt: string;
@@ -75,6 +78,7 @@ export interface IncidentDetail {
   evidenceRequests: EvidenceRequestView[];
   decisions: DecisionView[];
   holds: HoldView[];
+  assessments: AssessmentView[];
   canReview: boolean;
   canWrite: boolean;
 }
@@ -119,6 +123,14 @@ function incidentQuery(ctx: Ctx) {
         .where("holds.item_id", "is not", null)
         .where("holds.released_at", "is", null)
         .as("active_holds"),
+      eb
+        .selectFrom("ai_assessments")
+        .select("ai_assessments.verdict")
+        .whereRef("ai_assessments.incident_id", "=", "damage_incidents.id")
+        .where("ai_assessments.status", "=", "completed")
+        .orderBy("ai_assessments.created_at", "desc")
+        .limit(1)
+        .as("ai_verdict"),
     ]);
 }
 
@@ -144,6 +156,7 @@ function toSummary(row: IncidentRow): IncidentSummary {
     photoCount: Number(row.photo_count ?? 0),
     openEvidenceRequests: Number(row.open_requests ?? 0),
     holdActive: Number(row.active_holds ?? 0) > 0,
+    aiVerdict: row.ai_verdict ?? null,
     revision: row.revision,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -375,6 +388,7 @@ export function getIncident(ctx: Ctx, actor: Actor, incidentId: string): Inciden
     evidenceRequests,
     decisions,
     holds,
+    assessments: listAssessments(ctx, incidentId),
     canReview: roles.includes("reviewer"),
     canWrite: roles.some((r) => r === "mover" || r === "reviewer"),
   };

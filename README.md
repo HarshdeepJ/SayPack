@@ -3,13 +3,13 @@
 > Unified Model Document (UMD) — proposed MVP specification.
 >
 > Working name: SayPack. The name can change without changing the product scope.
-> This document describes the intended system. Milestones 1 (manual inventory) and 2 (damage workflow) are implemented; later milestones are not.
+> This document describes the intended system. Milestones 1 to 4 (manual inventory, damage workflow, voice with budget guard, AI photo checks) are implemented; later milestones are not.
 
 See [the Product Requirements Document](PRD.md) for prioritized requirements, system design, failure handling, and release criteria.
 
 ## Running locally
 
-Milestones 1 (manual inventory) and 2 (damage workflow: photos, incidents, holds, reviewer decisions) are implemented. It needs Node.js 22 or later.
+Milestones 1 (manual inventory), 2 (damage workflow: photos, incidents, holds, reviewer decisions), 3 (voice commands with confirmation and an AI budget) and 4 (AI checks of damage photos) are implemented. It needs Node.js 22 or later.
 
 ```sh
 npm install
@@ -28,10 +28,21 @@ Sign in as the administrator, then use **Admin** to create users and moves and t
 | `npm run backup` | Consistent backup of the database and referenced photos to `backups/<timestamp>/`; safe while the app runs |
 | `npm run restore -- backups/<timestamp>` | Restore a backup; refuses while the app is running and moves current data aside first |
 | `npm run sweep-photos` | Delete photo files no database row references (crash leftovers older than an hour) |
+| `npm run gemini-check -- "<command>"` | One real Gemini call outside the app's allowance; add `--photo <file>` to test a damage photo check |
+
+### Voice and the AI budget
+
+Voice runs on a free mock until real Gemini is switched on. The mock understands typed commands such as "Blue vase, box A, fragile, no visible damage", "move blue vase to box B" and "damage blue vase: crack on rim". To use Gemini, copy `.env.example` to `.env.local`, set `SAYPACK_AI_PROVIDER=gemini` and `GEMINI_API_KEY`, and restart. Make one test command and check the admin page's AI usage card before relying on it.
+
+The application allowance defaults to S$5 and the USD to SGD rate to an assumed 1.35; both are editable on the admin page. Every call reserves a worst-case estimate first and settles to the reported token usage afterwards; calls with an unknown outcome stay charged at the estimate. When the allowance is used up, voice and photo checks are disabled and manual entry keeps working. This is SayPack's own safeguard, not a billing cap enforced by Google.
+
+### AI photo checks
+
+When a mover reports damage (by voice or the form), the app asks for a photo. Each damage photo is sent to Gemini automatically, with the item's baseline photo if there is one. The result (damage visible, no damage seen, or photo unclear, with a short description) is shown to the mover, read aloud after a voice report, and flagged in the reviewer queue. The check only describes the photo: the item stays on hold whatever it says, and only a reviewer can release it. If the check fails or the allowance is used up, the photo still reaches the reviewer. Each incident can be checked at most 5 times; a check costs about S$0.001.
 
 Data is stored in `data/`: the database `saypack.db` and private photos under `photos/` (override the folder with `SAYPACK_DATA_DIR`, or each path with `SAYPACK_DB` and `SAYPACK_PHOTOS`; backups go to `SAYPACK_BACKUP_DIR`). Never copy or move `saypack.db` by hand while it has `-wal`/`-shm` files beside it; use `npm run backup` and `npm run restore`. Session cookies are `Secure`; browsers accept them on `http://localhost` and over Tailscale HTTPS. To test from another plain-HTTP host, set `SAYPACK_INSECURE_COOKIES=1`. If a proxy rewrites the Host header, list the public origin in `SAYPACK_ALLOWED_ORIGINS` (comma-separated).
 
-Code layout: `migrations/` holds the SQL schema, `src/domain/` the framework-independent business rules and their tests, `src/storage/` file paths and the photo store, `src/server/` the HTTP glue, `src/app/` the pages and route handlers, and `scripts/` the admin, backup and restore commands.
+Code layout: `migrations/` holds the SQL schema, `src/domain/` the framework-independent business rules and their tests, `src/ai/` the Gemini and mock providers, `src/storage/` file paths and the photo store, `src/server/` the HTTP glue, `src/app/` the pages and route handlers, and `scripts/` the admin, backup, restore, photo sweep and Gemini check commands.
 
 ## 1. Purpose
 

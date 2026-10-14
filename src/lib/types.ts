@@ -20,3 +20,6 @@ export type {
   IncidentSummary,
 } from "@/domain/incidents";
 export type { ItemDetail } from "@/domain/views";
+export type { AiStatus, ConfirmOutcome, ProposalView, VoiceResult } from "@/domain/voice";
+export type { UsageSummary } from "@/domain/budget";
+export type { AssessmentView } from "@/domain/assessment";

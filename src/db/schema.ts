@@ -184,7 +184,91 @@ export interface PhotosTable {
   created_at: string;
 }
 
+export type VoiceOperation = "record_item" | "assign_item_to_box" | "record_condition" | "report_damage";
+
+export interface VoiceRequestsTable {
+  id: string;
+  move_id: string;
+  user_id: string;
+  input_kind: "audio" | "text";
+  input_hash: string;
+  audio_seconds: number | null;
+  context_json: string;
+  clarifies_request_id: string | null;
+  status: "pending" | "proposed" | "clarification" | "failed";
+  transcript: string | null;
+  result_json: string | null;
+  error_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface VoiceProposalsTable {
+  id: string;
+  request_id: string;
+  move_id: string;
+  user_id: string;
+  operation: VoiceOperation;
+  args_json: string;
+  readback: string;
+  context_box_id: string | null;
+  status: "pending" | "confirmed" | "cancelled" | "expired";
+  outcome_json: string | null;
+  expires_at: string;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface AiUsageTable {
+  id: string;
+  request_id: string;
+  operation: string;
+  model: string;
+  status: "reserved" | "settled" | "uncertain" | "released";
+  reserved_micro_sgd: number;
+  cost_micro_sgd: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  pricing_version: string;
+  usd_to_sgd: number;
+  created_at: string;
+  settled_at: string | null;
+}
+
+export interface AiSettingsTable {
+  id: number;
+  allowance_micro_sgd: number;
+  usd_to_sgd: number;
+  consecutive_failures: number;
+  breaker_open_until: string | null;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export type AssessmentVerdict = "damage_visible" | "no_damage_visible" | "inconclusive";
+
+export interface AiAssessmentsTable {
+  id: string;
+  incident_id: string;
+  move_id: string;
+  requested_by: string;
+  status: "pending" | "completed" | "failed";
+  photo_ids_json: string;
+  baseline_photo_id: string | null;
+  verdict: AssessmentVerdict | null;
+  result_json: string | null;
+  model: string;
+  error_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface Schema {
+  ai_assessments: AiAssessmentsTable;
+  voice_requests: VoiceRequestsTable;
+  voice_proposals: VoiceProposalsTable;
+  ai_usage: AiUsageTable;
+  ai_settings: AiSettingsTable;
   users: UsersTable;
   sessions: SessionsTable;
   moves: MovesTable;

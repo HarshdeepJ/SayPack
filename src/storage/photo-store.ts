@@ -59,6 +59,10 @@ export class PhotoStore implements PhotoFiles {
     await fs.promises.rename(stagingPath, finalPath);
   }
 
+  async read(storageKey: string): Promise<Uint8Array> {
+    return new Uint8Array(await fs.promises.readFile(this.pathFor(storageKey)));
+  }
+
   async remove(storageKey: string): Promise<void> {
     await fs.promises.rm(this.pathFor(storageKey), { force: true });
   }

@@ -5,6 +5,8 @@ import type { Db } from "@/db/database";
 export interface PhotoFiles {
   /** True when the committed file for this storage key is present on disk. */
   exists(storageKey: string): boolean;
+  /** The committed file's bytes; used to send photos for assessment. */
+  read(storageKey: string): Promise<Uint8Array>;
 }
 
 /** Dependencies every application service receives. Swappable in tests. */
@@ -35,7 +37,9 @@ export type DomainErrorCode =
   | "forbidden"
   | "not_found"
   | "conflict"
-  | "invalid";
+  | "invalid"
+  /** A dependency (AI provider, allowance) is unavailable; manual paths still work. */
+  | "unavailable";
 
 /** Expected business outcome other than "committed". Route handlers map code to HTTP status. */
 export class DomainError extends Error {

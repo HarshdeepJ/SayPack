@@ -15,6 +15,7 @@ const STATUS: Record<DomainError["code"], number> = {
   not_found: 404,
   conflict: 409,
   invalid: 422,
+  unavailable: 503,
 };
 
 export type ErrorBody = {
