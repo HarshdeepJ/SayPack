@@ -1,0 +1,14 @@
+# Caddy terminates HTTPS and forwards requests to the app over the private
+# Compose network. The app's own port is never published.
+#
+# SAYPACK_DOMAIN is the public name on the VM, where Caddy gets and renews a
+# Let's Encrypt certificate by itself. Locally it is "localhost", for which
+# Caddy signs a certificate with its own local authority instead.
+#
+# SAYPACK_HTTPS_PORT is 443 on the VM and 8443 locally. Naming the port here
+# makes Caddy listen on it and include it in the automatic HTTP -> HTTPS
+# redirect (it omits the port only when it is 443).
+{$SAYPACK_DOMAIN}:{$SAYPACK_HTTPS_PORT} {
+	encode
+	reverse_proxy app:3000
+}

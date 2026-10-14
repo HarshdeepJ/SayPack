@@ -34,11 +34,13 @@ Sign in as the administrator, then use **Admin** to create users and moves and t
 ### Running in Docker
 
 ```sh
-docker compose up --build -d                                                   # http://localhost:3001
+docker compose up --build -d                                                   # https://localhost:8443
 docker compose run --rm tools create-admin -- --email you@example.com --name "Your Name"
 docker compose run --rm tools backup                                          # writes to ./backups/
-docker compose logs -f app
+docker compose logs -f app caddy
 ```
+
+Caddy serves HTTPS in front of the app, whose own port is not published. Locally it signs a certificate with its own authority, so the browser warns once; on a server, set `SAYPACK_DOMAIN`, `SAYPACK_BIND=0.0.0.0`, `SAYPACK_HTTP_PORT=80` and `SAYPACK_HTTPS_PORT=443` in `.env` and it gets a Let's Encrypt certificate.
 
 The database and photos live in the `saypack-data` volume, separate from the `data/` folder `npm start` uses. `docker compose down` keeps the volume; `down -v` deletes it. Optional settings such as `SAYPACK_AI_PROVIDER` go in `.env.docker` (never committed).
 
